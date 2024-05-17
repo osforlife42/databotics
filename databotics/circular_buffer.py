@@ -39,7 +39,6 @@ class MinCircularBuffer(CircularBuffer):
     def __init__(self, max_size=300, max_seconds=2):
         super().__init__(max_size, max_seconds)
         self.min_indices = []  # Store indices of minimum values
-        self.min_value = float('inf')
 
     def add(self, value):
         super().add(value)
@@ -51,18 +50,62 @@ class MinCircularBuffer(CircularBuffer):
         elif value == self.buffer[self.min_indices[0]]:
             self.min_indices.append(current_index)
         
+
+    def get_min_value(self):
         # Remove outdated min indices
         valid_time = time.time() - self.max_seconds
         while self.min_indices and self.timestamps[self.min_indices[0]] < valid_time:
             self.min_indices.pop(0)
 
-        # Update min value
-        if value < self.min_value:
-            self.min_value = value
+        # there's a min indice with valid time 
+        if self.min_indices:
+            return self.buffer[self.min_indices[0]]
 
-    def get_min_value(self):
-        return self.min_value
+        # check relevant data exists, and if exists recalculate min_indices 
+        relevant_data = self.get_data()
+        if not relevant_data.size: 
+            return None   
+        
+        min_value = np.min(self.buffer)
+        # Find indices where the value equals the minimum
+        self.min_indices = np.where(self.buffer == min_value)
+        return self.buffer[self.min_indices[0]]
     
+
+class OtherMinCircularBuffer(CircularBuffer):
+    def __init__(self, max_size=300, max_seconds=2):
+        super().__init__(max_size, max_seconds)
+        self.min_value = None
+
+    def add(self, value):
+        super().add(value)
+        if self.min_value is None or value < self.min_value:
+            self.min_value = value
+        elif self.timestamps[self.index] < time.time() - self.max_seconds:
+            self.update_min_value()
+
+    def update_min_value(self):
+        relevant_data = self.get_data()
+        if relevant_data:
+            self.min_value = min(relevant_data)
+        else:
+            self.min_value = None
+
+    def get_min_value(self,):
+        return self.min_value   
+
+# Usage example
+buffer = MinCircularBuffer(max_size=300, max_seconds=1)
+
+# Simulate adding data at 20 Hz for 10 seconds (200 samples)
+for i in range(200):
+    buffer.add(float(i))
+    time.sleep(0.01)  # Simulate 20 Hz
+
+# Retrieve the minimum value
+min_value = buffer.get_min_value()
+print("Min:", min_value)
+
 
 if __name__ == "__main__": 
     # Usage example
